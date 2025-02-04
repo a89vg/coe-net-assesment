@@ -1,0 +1,20 @@
+   /* Banner image */
+   .sidebar-banner,
+   img {
+     width: 100%;
+     height: auto;
+   }
+   
+   .sidebar,
+   a {
+     padding: 10px 15px;
+     text-decoration: none;
+     font-size: 18px;
+     color: #fff;
+     display: block;
+   }
+
+   .sidebar,
+   a:hover {
+     background-color: #555;
+   }
