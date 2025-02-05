@@ -8,22 +8,40 @@ using Swashbuckle.AspNetCore.SwaggerUI;
 using TA_API.Filters;
 using Microsoft.AspNetCore.Authorization;
 using TA_API.Auth;
+using FluentValidation;
+using TA_API.Models;
+using TA_API.Validation;
 
 namespace TA_API;
 
 public static class ApiSetup
 {
-    public static void SetupServices(this IServiceCollection services, IConfiguration config)
+    public static TSettings AddSettings<TSettings>(this IServiceCollection services, IConfiguration configuration) where TSettings : class, new()
     {
+        var settings = new TSettings();
+        configuration.Bind(settings);
+        services.AddSingleton(settings);
+        return settings;
+    }
+
+    public static void SetupApiServices(this IServiceCollection services, IConfiguration config)
+    {
+        services.AddSettings<AuthConfig>(config.GetSection("AuthConfig"));
         services.AddStackExchangeRedisCache(options =>
         {
             options.Configuration = config.GetSection("CacheConfig")["EndpointUrl"];
         });
+
         services.AddScoped(provider => new CurrentUserSessionProvider());
-        services.AddScoped<AuthMiddleware>();
+        services.AddScoped<SessionProviderMiddleware>();
         services.AddScoped<IAuthorizationHandler, ApiAuthHandler>();
         services.AddSingleton<IAuthorizationMiddlewareResultHandler, AuthFailureHandler>();
+
         services.AddDbContext<AssessmentDbContext>(options => options.UseSqlite(config.GetConnectionString("AssessmentDB")));
+        services.AddScoped<IValidator<NewUserModel>, NewUserValidator>();
+        services.AddScoped<IValidator<UserUpdateModel>, UserUpdateValidator>();
+        services.AddScoped<IValidator<UserLoginModel>, UserLoginValidator>();
+        services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<ErrorHandlingFilter>();
     }

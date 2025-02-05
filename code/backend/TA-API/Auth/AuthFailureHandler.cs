@@ -28,7 +28,7 @@ public class AuthFailureHandler : IAuthorizationMiddlewareResultHandler
 
         if (authorizationFailureReason?.Handler is ApiAuthHandler)
         {
-            var response = new Response
+            var response = new ResponseModel
             {
                 Message = authorizationFailureReason?.Message
             };
@@ -41,7 +41,7 @@ public class AuthFailureHandler : IAuthorizationMiddlewareResultHandler
 
                 var userSession = JsonSerializer.Deserialize<UserSession>(serializedSession)!;
 
-                Logger.LogWarning("Unauthorized request by {CurrentUser}", userSession.Username);
+                Logger.LogWarning("Unauthorized request by {User}", userSession.Username);
             }
 
             context.Response.StatusCode = StatusCodes.Status403Forbidden;

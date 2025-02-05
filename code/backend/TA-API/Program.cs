@@ -7,10 +7,10 @@ using System.Text;
 using System.Text.Json.Serialization;
 using TA_API;
 using TA_API.Auth;
-using TA_API.Services;
 
 var builder = WebApplication.CreateBuilder(args);
-builder.Host.UseSerilog((ctx, lc) => {
+builder.Host.UseSerilog((ctx, lc) =>
+{
     lc.MinimumLevel.Is(LogEventLevel.Information)
         .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
         .MinimumLevel.Override("Microsoft.Hosting.Lifetime", LogEventLevel.Warning)
@@ -19,24 +19,33 @@ builder.Host.UseSerilog((ctx, lc) => {
         .Enrich.FromLogContext();
     lc.WriteTo.Async(lc => lc.Console(new JsonFormatter()));
 });
-builder.Services.AddControllers().AddJsonOptions(options =>
-{
-    options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
-    options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
-});
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
+        options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
+    })
+    .ConfigureApiBehaviorOptions(options =>
+    {
+        options.SuppressMapClientErrors = true;
+        options.SuppressModelStateInvalidFilter = true;
+    });
 builder.Services.AddSwagger();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>
     {
+        var authConfig = new AuthConfig();
+        builder.Configuration.GetSection("AuthConfig").Bind(authConfig);
+
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
             ValidateAudience = true,
             ValidateLifetime = true,
-            ValidIssuer = builder.Configuration.GetSection("AuthConfig")["Issuer"],
-            ValidAudience = builder.Configuration.GetSection("AuthConfig")["Audience"],
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration.GetSection("AuthConfig")["SigningKey"]))
+            ValidIssuer = authConfig.Issuer,
+            ValidAudience = authConfig.Audience,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(authConfig.SigningKey))
         };
     });
 
@@ -54,7 +63,7 @@ builder.Services.AddAuthorization(options =>
     });
 });
 
-builder.Services.SetupServices(builder.Configuration);
+builder.Services.SetupApiServices(builder.Configuration);
 
 var app = builder.Build();
 

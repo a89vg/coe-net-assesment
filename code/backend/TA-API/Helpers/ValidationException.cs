@@ -1,7 +1,16 @@
-﻿namespace TA_API.Helpers;
+﻿using TA_API.Models;
+
+namespace TA_API.Helpers;
 
 
-public class ValidationException(string errorMessage) : Exception
+public class ValidationException : ApiException
 {
-    public ValidationError ValidationError { get; } = new ValidationError(errorMessage);
+    public ValidationException(string errorMessage) : base(errorMessage, LogLevel.Warning, 400)
+    {
+        ErrorResponse = new ResponseModel
+        {
+            Message = "API Validation Error",
+            ErrorDetails = errorMessage
+        };
+    }
 }

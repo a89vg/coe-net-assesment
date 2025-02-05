@@ -1,11 +1,10 @@
-﻿using System.Collections.Generic;
-using System.Text.Json.Serialization;
+﻿using System.Text.Json.Serialization;
 
 namespace TA_API.Models;
 
-public class Response
+public class ResponseModel
 {
-    public Response() => Success = false;
+    public ResponseModel() => Success = false;
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? ApiToken { get; set; } = null;
@@ -20,9 +19,12 @@ public class Response
     public long? Count { get; set; } = null;
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? ErrorId { get; set; } = null;
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ErrorDetails { get; set; } = null;
+
 }
 
-public class Response<T> : Response
+public class Response<T> : ResponseModel
 {
     public Response() { }
 

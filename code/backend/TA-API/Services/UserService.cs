@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Identity;
-using Microsoft.Extensions.Caching.Distributed;
-using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
+using System.Globalization;
 using TA_API.Helpers;
 using TA_API.Interfaces;
 using TA_API.Models;
@@ -9,160 +9,73 @@ using TA_API.Services.Data;
 
 namespace TA_API.Services;
 
-public class UserService : IUserService
+public class UserService(AssessmentDbContext dbContext) : IUserService
 {
-    private readonly AssessmentDbContext dbContext;
-    private readonly IDistributedCache sessionStorage;
-
-    public UserService(AssessmentDbContext dbContext, IDistributedCache cache)
+    public async Task<List<UserModel>> GetUsers()
     {
-        this.dbContext = dbContext;
-        sessionStorage = cache;
+        var users = await dbContext.Users.ToListAsync();
+
+        return users.Select(u => new UserModel
+        {
+            Id = u.Id,
+            Username = u.Username,
+            Email = u.Email,
+            FullName = u.FullName,
+            DateOfBirth = u.DateOfBirth.ToString("yyyy-MM-dd")
+        }).ToList();
     }
 
-    public async Task<List<User>> GetUsers()
+    public async Task<ResponseModel> CreateUser(NewUserModel newUser)
     {
-        try
-        {
-            var users = dbContext.Users.ToList();
+        var passwordHasher = new PasswordHasher<NewUserModel>();
+        var passwordHash = passwordHasher.HashPassword(newUser, newUser.Password);
 
-            return users;
-        }
-        catch (Exception ex)
+        var user = new User
         {
-            ex.LogError("Error getting users");
+            Username = newUser.Username,
+            Email = newUser.Email,
+            FullName = newUser.FullName,
+            DateOfBirth = DateTime.ParseExact(newUser.DateOfBirth, "yyyy-MM-dd", CultureInfo.InvariantCulture),
+            PasswordHash = passwordHash
+        };
 
-            throw;
-        }
+        dbContext.Users.Add(user);
+
+        await dbContext.SaveChangesAsync();
+
+        return new ResponseModel
+        {
+            Success = true
+        };
     }
 
-    public async Task<Response> CreateUser(NewUser newUser)
+    public async Task<ResponseModel> UpdateUser(int userId, UserUpdateModel user)
     {
-        try
+        var existingUser = await dbContext.Users.SingleOrDefaultAsync(u => u.Id == userId) ?? throw new ApiException("Record not found", statusCode: 404);
+
+        existingUser.FullName = user.FullName;
+        existingUser.DateOfBirth = DateTime.ParseExact(user.DateOfBirth, "yyyy-MM-dd", CultureInfo.InvariantCulture);
+        existingUser.Email = user.Email;
+
+        await dbContext.SaveChangesAsync();
+
+        return new ResponseModel
         {
-            if (!string.IsNullOrEmpty(newUser.PasswordConfirmation) && newUser.Password != newUser.PasswordConfirmation)
-            {
-                return new Response { Message = "Password and confirmation do nto match" };
-            }
-
-            var passwordHasher = new PasswordHasher<NewUser>();
-            var passwordHash = passwordHasher.HashPassword(newUser, newUser.Password);
-
-            var user = new User
-            {
-                Username = newUser.Username,
-                PasswordHash = passwordHash
-            };
-
-            await dbContext.Users.AddAsync(user);
-            await dbContext.SaveChangesAsync();
-
-            return new Response
-            {
-                Success = true
-            };
-        }
-        catch (Exception ex)
-        {
-            ex.LogError("Error creating user");
-
-            throw;
-        }
+            Success = true
+        };
     }
 
-    public async Task<Response> UpdateUser(int userId, User user)
+    public async Task<ResponseModel> DeleteUser(int userId)
     {
-        try
+        var user = await dbContext.Users.SingleOrDefaultAsync(u => u.Id == userId) ?? throw new ApiException("Record not found", statusCode: 404);
+
+        dbContext.Users.Remove(user);
+
+        await dbContext.SaveChangesAsync();
+
+        return new ResponseModel
         {
-            var existingUser = dbContext.Users.Where(u => u.Id == userId).SingleOrDefault();
-
-            //TODO: Update user
-
-            await dbContext.SaveChangesAsync();
-
-            return new Response
-            {
-                Success = true
-            };
-        }
-        catch (Exception ex)
-        {
-            ex.LogError("Error updating user");
-
-            throw;
-        }
-    }
-
-    public async Task<Response> DeleteUser(int userId)
-    {
-        try
-        {
-            var user = dbContext.Users.Where(u => u.Id.Equals(userId)).SingleOrDefault();
-
-            dbContext.Users.Remove(user);
-
-            await dbContext.SaveChangesAsync();
-
-            return new Response
-            {
-                Success = true
-            };
-        }
-        catch (Exception ex)
-        {
-            ex.LogError("Error deleting user");
-
-            throw;
-        }
-    }
-
-    public async Task<Response> Login(UserLogin userLogin)
-    {
-        try
-        {
-            var user = dbContext.Users.Where(u => u.Username.Equals(userLogin.Username)).SingleOrDefault();
-
-            if (user is null)
-            {
-                return new Response { Message = "Wrong username and/or password" };
-            }
-
-            var passwordHasher = new PasswordHasher<User>();
-
-            var result = passwordHasher.VerifyHashedPassword(user, user.PasswordHash, userLogin.Password);
-
-            if (result != PasswordVerificationResult.Success)
-            {
-                return new Response { Message = "Wrong username and/or password" };
-            }
-
-            var userSession = new UserSession
-            {
-                Username = user.Username,
-                FullName = user.FullName,
-                Email = user.Email
-            };
-
-            var roles = dbContext.UserRoles.Where(u => u.Username == userLogin.Username).Select(r => r.Role).ToList();
-
-            if (roles.Count == 0)
-            {
-                return new Response { Message = "User does not have a role assigned" };
-            }
-
-            userSession.Roles = roles;
-
-            var sessionId = Guid.NewGuid().ToString();
-
-            await sessionStorage.SetStringAsync(sessionId, JsonSerializer.Serialize(userSession));
-
-            return new Response { Success = true, SID = sessionId };
-        }
-        catch (Exception ex)
-        {
-            ex.LogError("Error on user login");
-
-            throw;
-        }
+            Success = true
+        };
     }
 }

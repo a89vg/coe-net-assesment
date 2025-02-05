@@ -1,53 +1,58 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.AspNetCore.Mvc.Filters;
-using System.ComponentModel.DataAnnotations;
+using Serilog.Context;
 using TA_API.Auth;
+using TA_API.Helpers;
 using TA_API.Models;
 using TA_API.Models.Data;
 
+
 namespace TA_API.Filters;
 
-public class ErrorHandlingFilter : IExceptionFilter
+public class ErrorHandlingFilter(CurrentUserSessionProvider currentUserSession, ILogger<ErrorHandlingFilter> logger) : IExceptionFilter
 {
-    public ErrorHandlingFilter(CurrentUserSessionProvider currentUserSession)
-    {
-        CurrentUserSession = currentUserSession.UserSession is not null ? currentUserSession.UserSession : null;
-    }
-
-    public UserSession? CurrentUserSession { get; set; }
+    public UserSession? CurrentUserSession { get; set; } = currentUserSession.UserSession is not null ? currentUserSession.UserSession : null;
 
     public void OnException(ExceptionContext context)
     {
-        var action = ((ControllerActionDescriptor)context.ActionDescriptor).DisplayName;
+        var level = LogLevel.Error;
+        int statusCode = 500;
 
-        string errorId;
+        ResponseModel response;
 
-        if (context.Exception.Data.Contains("ErrorId"))
+        switch (context.Exception)
         {
-            errorId = context.Exception.Data["ErrorId"].ToString();
+            case ApiException apiException:
+                response = apiException.ErrorResponse;
+                level = apiException.Severity;
+                statusCode = apiException.StatusCode;
+                break;
+            default:
+                response = new ResponseModel
+                {
+                    Message = "Unhandled Error in API"
+                };
+                break;
         }
-        else
+
+        var errorId = Guid.NewGuid().ToString();
+        var action = (ControllerActionDescriptor)context.ActionDescriptor;
+        var endpointId = action.MethodInfo.Name;
+
+        LogContext.PushProperty("ErrorId", errorId);
+        LogContext.PushProperty("EndpointId", endpointId);
+
+        if (CurrentUserSession is not null)
         {
-            errorId = Guid.NewGuid().ToString("D");
+            LogContext.PushProperty("User", CurrentUserSession.Username);
         }
 
-        var response = new Response
-        {
-            ErrorId = errorId
-        };
+        logger.Log(level, context.Exception, response.ErrorDetails ?? response.Message);
 
-        response.Message = context.Exception switch
-        {
-            ValidationException validationException => validationException.Message,
-            _ => context.Exception.Data.Contains("Message") ? context.Exception.Data["Message"].ToString() : context.Exception.Message,
-        };
+        response.ErrorId = errorId;
 
-        var result = context.Exception switch
-        {
-            ValidationException => new BadRequestObjectResult(response),
-            _ => new ObjectResult(response) { StatusCode = StatusCodes.Status500InternalServerError }
-        };
+        var result = new ObjectResult(response) { StatusCode = statusCode };
 
         context.Result = result;
     }

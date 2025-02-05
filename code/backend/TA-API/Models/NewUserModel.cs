@@ -1,6 +1,6 @@
 ﻿namespace TA_API.Models;
 
-public class NewUser
+public class NewUserModel
 {
     public string Username { get; set; }
 
@@ -12,6 +12,6 @@ public class NewUser
 
     public string PasswordConfirmation { get; set; }
 
-    public DateTime DateOfBirth { get; set; }
+    public string DateOfBirth { get; set; }
 }
 

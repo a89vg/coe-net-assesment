@@ -11,8 +11,6 @@ public class User
     public string Email { get; set; }
 
     public string FullName { get; set; }
-
-    [JsonIgnore(Condition = JsonIgnoreCondition.Always)]
     public string PasswordHash { get; set; }
 
     public DateTime DateOfBirth { get; set; }
