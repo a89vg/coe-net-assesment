@@ -16,6 +16,7 @@ namespace TA_API;
 
 public static class ApiSetup
 {
+
     public static TSettings AddSettings<TSettings>(this IServiceCollection services, IConfiguration configuration) where TSettings : class, new()
     {
         var settings = new TSettings();
@@ -43,7 +44,9 @@ public static class ApiSetup
         services.AddScoped<IValidator<UserLoginModel>, UserLoginValidator>();
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IUserService, UserService>();
+        services.AddScoped<ICommentsService, CommentsService>();
         services.AddScoped<ErrorHandlingFilter>();
+        services.AddHttpClient();
     }
 
     public static void AddSwagger(this IServiceCollection services)

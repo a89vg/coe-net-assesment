@@ -32,6 +32,8 @@ builder.Services.AddControllers()
     });
 builder.Services.AddSwagger();
 
+builder.Services.AddCors();
+
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>
     {
@@ -69,6 +71,12 @@ var app = builder.Build();
 
 app.UseSwagger();
 app.UseSerilogRequestLogging();
+app.UseCors(policy =>
+{
+    policy.AllowAnyHeader();
+    policy.AllowAnyMethod();
+    policy.AllowAnyOrigin();
+});
 app.UseHsts();
 app.UseHttpsRedirection();
 app.UseRouting();
